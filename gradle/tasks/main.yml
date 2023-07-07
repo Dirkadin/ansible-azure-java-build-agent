@@ -1,0 +1,58 @@
+- name: Checking if Gradle is already installed
+  ansible.builtin.stat:
+    path: '{{ gradle_home_parent_directory }}/gradle-{{ gradle_version }}'
+  register: gradle_installed
+
+- name: Delete gradle directory
+  ansible.builtin.file:
+    path: '{{ gradle_home_parent_directory }}/'
+    state: absent
+  when: not gradle_installed.stat.exists
+
+- name: Create gradle lib directory if it does not exist
+  ansible.builtin.file:
+    path: '{{ gradle_home_parent_directory }}'
+    state: directory
+    mode: '0755'
+  when: not gradle_installed.stat.exists
+
+- name: Downloading Gradle Binaries for version '{{ gradle_version }}'
+  ansible.builtin.get_url:
+    url: '{{ gradle_download_url }}'
+    dest: '{{ gradle_home_parent_directory }}/{{ gradle_file_name }}'
+    owner: 'root'
+    group: 'root'
+    mode: '0644'
+  when: not gradle_installed.stat.exists
+
+- name: Unarchive Gradle Binaries
+  ansible.builtin.unarchive:
+    src: '{{ gradle_home_parent_directory }}/{{ gradle_file_name }}'
+    dest: '{{ gradle_home_parent_directory }}'
+    copy: false
+  when: not gradle_installed.stat.exists
+
+- name: Remove Gradle symlink
+  ansible.builtin.file:
+    path: '{{ gradle_home_parent_directory }}/gradle-{{ gradle_version[:1] }}'
+    state: absent
+  when: not gradle_installed.stat.exists
+
+- name: Create a symbolic link
+  ansible.builtin.file:
+    src: '{{ gradle_home_parent_directory }}/gradle-{{ gradle_version }}'
+    dest: '{{ gradle_home_parent_directory }}/gradle-{{ gradle_version[:1] }}'
+    owner: root
+    group: root
+    state: link
+
+- name: Create Gradle alternative
+  community.general.alternatives:
+    name: gradle
+    link: /usr/bin/gradle
+    path: '{{ gradle_home_parent_directory }}/gradle-{{ gradle_version[:1] }}/bin/gradle'
+
+- name: Cleaning Up
+  ansible.builtin.file:
+    state: absent
+    path: '{{ gradle_home_parent_directory }}/{{ gradle_file_name }}'
